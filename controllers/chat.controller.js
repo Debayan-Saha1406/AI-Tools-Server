@@ -18,18 +18,37 @@ const parkInfo = fs.readFileSync(
 );
 
 const instructions = template.replace("{{parkInfo}}", parkInfo);
+const sessions = new Map();
+
 
 export async function chat(req, res) {
   try {
-    const { message } = req.body;
+    const { message, sessionId } = req.body;
+
+    const id = sessionId || "default";
+
+    if (!sessions.has(id)) {
+      sessions.set(id, []);
+    }
+
+    const history = sessions.get(id);
+
+    // Add user message
+    history.push({ role: "user", content: message });
+
+    const historyText = history
+      .map(m => `${m.role.toUpperCase()}: ${m.content}`)
+      .join("\n");
+
     const fullPrompt = `
+        Conversation: ${historyText},
         System Instructions: ${instructions}
-        QUESTION: ${message}
+        Assistant: ${message}
         `;
 
     const ollamaClient = llmFactory.getClient(LLM_TYPES.OLLAMA);
     const result = await ollamaClient.generate(fullPrompt);
-
+    history.push({ role: "assistant", content: result });
     res.json({ result });
   } catch (err) {
     console.error(err);
